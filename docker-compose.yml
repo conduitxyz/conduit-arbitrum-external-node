@@ -1,0 +1,30 @@
+# Usage: make up 
+services:
+  node:
+    container_name: node
+    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.9.4-7f582c3}
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8547}:8547"
+      - "${WS_PORT:-8546}:8546"
+    volumes:
+      - "${PWD}/chainInfo.json:/config/chainInfo.json"
+      - "./data/${CHAIN_NAME:-default}:/home/user/.arbitrum"
+    entrypoint:
+      - "/usr/local/bin/nitro"
+      - --conf.file=/config/chainInfo.json
+      - --node.staker.enable=false
+      - --execution.forwarding-target=${FORWARDING_TARGET}
+      - --http.api=net,web3,eth
+      - --http.corsdomain=*
+      - --http.addr=0.0.0.0
+      - --http.vhosts=*
+      - --node.feed.input.url=${SEQUENCER_FEED_RELAY}
+      - --parent-chain.connection.url=${PARENT_CHAIN_RPC}
+      - --parent-chain.blob-client.beacon-url=${PARENT_CHAIN_BEACON_URL}
+      - --node.data-availability.enable
+      - --node.data-availability.rest-aggregator.enable
+      - --node.data-availability.rest-aggregator.urls=${DAS_URL}
+      - --execution.caching.archive
+      # comment the line above if you do not want to run in archive mode

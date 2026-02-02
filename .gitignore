@@ -1,0 +1,5 @@
+.env
+chainInfo.json
+
+# chain data 
+data/

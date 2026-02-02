@@ -1,0 +1,66 @@
+# Arbitrum node with Celestia DA (with AnyTrust fallback)
+# Usage: make up ALTDA=true
+services:
+  node:
+    container_name: node
+    image: ${NITRO_IMAGE:-ghcr.io/celestiaorg/nitro:v3.6.8}
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8547}:8547"
+      - "${WS_PORT:-8546}:8546"
+    volumes:
+      - "${PWD}/chainInfo.json:/config/chainInfo.json"
+      - "./data/${CHAIN_NAME:-default}:/home/user/.arbitrum"
+    entrypoint:
+      - "/usr/local/bin/nitro"
+      - --conf.file=/config/chainInfo.json
+      - --node.staker.enable=false
+      - --execution.forwarding-target=${FORWARDING_TARGET}
+      - --http.api=net,web3,eth
+      - --http.corsdomain=*
+      - --http.addr=0.0.0.0
+      - --http.vhosts=*
+      - --node.feed.input.url=${SEQUENCER_FEED_RELAY}
+      - --parent-chain.connection.url=${PARENT_CHAIN_RPC}
+      - --parent-chain.blob-client.beacon-url=${PARENT_CHAIN_BEACON_URL}
+      - --node.da-provider.enable=true
+      - --node.da-provider.rpc.url=http://celestia-das:9876
+      - --node.data-availability.enable=false
+      - --execution.caching.archive
+      # comment the line above if you do not want to run in archive mode
+
+    depends_on:
+      - celestia-das
+
+  celestia-das:
+    container_name: celestia-das
+    image: ${CELESTIA_DAS_IMAGE:-ghcr.io/celestiaorg/nitro-das-celestia:v0.5.6}
+    platform: linux/amd64
+    restart: unless-stopped
+    entrypoint:
+      - /bin/celestia-server
+      - --celestia.rpc=${CELESTIA_RPC}
+      - --celestia.namespace-id=${CELESTIA_NAMESPACE_ID}
+      - --enable-rpc
+      - --rpc-addr=0.0.0.0
+      - --rpc-port=9876
+      # AnyTrust fallback
+      - --fallback-enabled=true
+      - --das.enable=true
+      - --das.rpc.url=http://dap:9880
+
+  dap:
+    image: ghcr.io/celestiaorg/nitro:v3.6.8
+    platform: linux/amd64
+    restart: unless-stopped
+    container_name: dap
+    entrypoint: /usr/local/bin/daprovider
+    command:
+      - --das-server.port=9880
+      - --das-server.addr=0.0.0.0
+      - --das-server.data-availability.enable=true
+      - --das-server.data-availability.parent-chain-node-url=${PARENT_CHAIN_RPC}
+      - --das-server.data-availability.sequencer-inbox-address=${SEQUENCER_INBOX_ADDRESS}
+      - --das-server.data-availability.rest-aggregator.enable=true
+      - --das-server.data-availability.rest-aggregator.urls=${DAS_URL}
