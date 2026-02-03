@@ -2,7 +2,7 @@
 services:
   node:
     container_name: node
-    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.9.4-7f582c3}
+    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.9.5-66e42c4}
     platform: linux/amd64
     restart: unless-stopped
     ports:
