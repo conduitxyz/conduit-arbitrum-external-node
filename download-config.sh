@@ -19,6 +19,7 @@ for arg in "$@"; do
 done
 
 API_URL="https://api.conduit.xyz/file/v1/arbitrum/chaininfo"
+CELESTIA_NS_API_URL="https://api.conduit.xyz/public/network/celestiaNamespace"
 
 if [ -z "$SLUG" ]; then
     echo "Error: Network slug required."
@@ -70,6 +71,21 @@ if command -v jq &> /dev/null && [ -f .env ]; then
         update_env "SEQUENCER_INBOX_ADDRESS" "$SEQ_INBOX"
         echo "  SEQUENCER_INBOX_ADDRESS=$SEQ_INBOX"
         echo ""
+    fi
+fi
+
+# Fetch and set Celestia namespace if celestia mode
+if [ "$CELESTIA" = "true" ] && [ -f .env ] && command -v jq &> /dev/null; then
+    echo "Fetching Celestia namespace for $SLUG..."
+    CELESTIA_NS_RAW=$(curl -sf "${CELESTIA_NS_API_URL}/${SLUG}" | jq -r '.namespace // empty')
+
+    if [ -n "$CELESTIA_NS_RAW" ]; then
+        CELESTIA_NS="${CELESTIA_NS_RAW: -20}"
+
+        update_env "CELESTIA_NAMESPACE_ID" "$CELESTIA_NS"
+        echo "  CELESTIA_NAMESPACE_ID=$CELESTIA_NS"
+    else
+        echo "Warning: Could not fetch Celestia namespace for $SLUG"
     fi
 fi
 
