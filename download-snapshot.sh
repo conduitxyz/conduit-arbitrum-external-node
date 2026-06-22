@@ -50,6 +50,16 @@ format_bytes() {
     fi
 }
 
+make_writable() {
+    local target="$1"
+    shift
+
+    if ! chmod "$@" "$target"; then
+        echo "Warning: unable to update permissions for ${target}."
+        echo "If the node cannot write to this directory, fix host permissions and rerun setup or up."
+    fi
+}
+
 start_progress_monitor() {
     (
         while true; do
@@ -88,12 +98,12 @@ DATADIR="${DATADIR:-./data/${CHAIN_NAME:-$NETWORK}}"
 mkdir -p "$DATADIR"
 
 if find "$DATADIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
-    chmod -R a+rwX "$DATADIR"
+    make_writable "$DATADIR" -R a+rwX
     echo "Snapshot restore skipped: ${DATADIR} already contains data."
     exit 0
 fi
 
-chmod a+rwX "$DATADIR"
+make_writable "$DATADIR" a+rwX
 
 if ! command -v gcloud >/dev/null 2>&1; then
     echo "Error: gcloud is required to restore requester-pays snapshots."
@@ -137,7 +147,7 @@ trap 'stop_progress_monitor; exit 130' INT
 trap 'stop_progress_monitor; exit 143' TERM
 gcloud --billing-project="$GCP_PROJECT" storage cat "$SNAPSHOT_URL" |
     tar --no-same-owner --no-same-permissions -xf - -C "$DATADIR" --strip-components=1
-chmod -R a+rwX "$DATADIR"
+make_writable "$DATADIR" -R a+rwX
 stop_progress_monitor
 trap - EXIT INT TERM
 

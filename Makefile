@@ -55,7 +55,7 @@ prepare-data:
 	DATA_DIR="./data/$${CHAIN_NAME_VALUE:-default}"; \
 	echo "Preparing $$DATA_DIR for container writes..."; \
 	mkdir -p "$$DATA_DIR"; \
-	chmod a+rwx "$$DATA_DIR"
+	chmod a+rwx "$$DATA_DIR" || echo "Warning: unable to update permissions for $$DATA_DIR; if the node cannot write there, fix host permissions and rerun make up."
 
 up: prepare-data
 	@echo "Starting containers with $(COMPOSE_FILE)..."
