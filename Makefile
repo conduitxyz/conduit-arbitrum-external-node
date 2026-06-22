@@ -1,4 +1,4 @@
-.PHONY: setup download snapshot up down logs status clean help
+.PHONY: setup download snapshot prepare-data up down logs status clean help
 
 NETWORK ?=
 ALTDA ?= false
@@ -22,6 +22,7 @@ help:
 	@echo "Targets:"
 	@echo "  setup    Download chain config and optionally restore a snapshot"
 	@echo "           Set SNAPSHOT_ENABLED=true in .env to restore before starting"
+	@echo "  prepare-data  Create the host data directory with container-writable permissions"
 	@echo "  up       Start containers"
 	@echo "  down     Stop containers"
 	@echo "  logs     Show container logs"
@@ -49,7 +50,14 @@ snapshot:
 		echo "Snapshot restore disabled; skipping."; \
 	fi
 
-up:
+prepare-data:
+	@CHAIN_NAME_VALUE=$$(awk -F= '/^CHAIN_NAME=/{value=$$2; gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$$/, "", value); print value; exit}' .env 2>/dev/null); \
+	DATA_DIR="./data/$${CHAIN_NAME_VALUE:-default}"; \
+	echo "Preparing $$DATA_DIR for container writes..."; \
+	mkdir -p "$$DATA_DIR"; \
+	chmod a+rwx "$$DATA_DIR"
+
+up: prepare-data
 	@echo "Starting containers with $(COMPOSE_FILE)..."
 	docker compose -f $(COMPOSE_FILE) up -d
 

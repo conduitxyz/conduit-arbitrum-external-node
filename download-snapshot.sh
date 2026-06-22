@@ -88,6 +88,7 @@ DATADIR="${DATADIR:-./data/${CHAIN_NAME:-$NETWORK}}"
 mkdir -p "$DATADIR"
 
 if find "$DATADIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    chmod -R a+rwX "$DATADIR"
     echo "Snapshot restore skipped: ${DATADIR} already contains data."
     exit 0
 fi
