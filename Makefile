@@ -54,7 +54,7 @@ prepare-data:
 	@CHAIN_NAME_VALUE=$$(awk -F= '/^CHAIN_NAME=/{value=$$2; gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$$/, "", value); print value; exit}' .env 2>/dev/null); \
 	DATA_DIR="./data/$${CHAIN_NAME_VALUE:-default}"; \
 	echo "Preparing $$DATA_DIR for container writes..."; \
-	mkdir -p "$$DATA_DIR"; \
+	mkdir -p "$$DATA_DIR" || (echo "Error: unable to create $$DATA_DIR. Fix host permissions, for example: sudo chown -R \$$(id -u):\$$(id -g) ./data" && exit 1); \
 	chmod a+rwx "$$DATA_DIR" || echo "Warning: unable to update permissions for $$DATA_DIR; if the node cannot write there, fix host permissions and rerun make up."
 
 up: prepare-data

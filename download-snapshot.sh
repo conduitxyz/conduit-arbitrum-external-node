@@ -60,6 +60,19 @@ make_writable() {
     fi
 }
 
+ensure_datadir() {
+    local parent
+
+    parent="$(dirname "$DATADIR")"
+    if ! mkdir -p "$DATADIR"; then
+        echo "Error: unable to create snapshot data directory: ${DATADIR}"
+        echo "The parent directory ${parent} is not writable by the current user."
+        echo "Fix host permissions, for example:"
+        echo "  sudo chown -R \$(id -u):\$(id -g) ${parent}"
+        exit 1
+    fi
+}
+
 start_progress_monitor() {
     (
         while true; do
@@ -95,7 +108,7 @@ fi
 CHAIN_NAME="${CHAIN_NAME:-$(read_env_value CHAIN_NAME)}"
 DATADIR="${DATADIR:-./data/${CHAIN_NAME:-$NETWORK}}"
 
-mkdir -p "$DATADIR"
+ensure_datadir
 
 if find "$DATADIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
     make_writable "$DATADIR" -R a+rwX
