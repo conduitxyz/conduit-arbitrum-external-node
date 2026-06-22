@@ -92,6 +92,8 @@ if find "$DATADIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
     exit 0
 fi
 
+chmod a+rwX "$DATADIR"
+
 if ! command -v gcloud >/dev/null 2>&1; then
     echo "Error: gcloud is required to restore requester-pays snapshots."
     echo "Install the Google Cloud CLI and configure billing."
@@ -134,6 +136,7 @@ trap 'stop_progress_monitor; exit 130' INT
 trap 'stop_progress_monitor; exit 143' TERM
 gcloud --billing-project="$GCP_PROJECT" storage cat "$SNAPSHOT_URL" |
     tar --no-same-owner --no-same-permissions -xf - -C "$DATADIR" --strip-components=1
+chmod -R a+rwX "$DATADIR"
 stop_progress_monitor
 trap - EXIT INT TERM
 
