@@ -1,4 +1,4 @@
-.PHONY: setup download up down logs status clean help
+.PHONY: setup download snapshot up down logs status clean help
 
 NETWORK ?=
 ALTDA ?= false
@@ -20,7 +20,8 @@ help:
 	@echo "  make setup NETWORK=<slug> ALTDA=celestia   Setup Celestia DA network"
 	@echo ""
 	@echo "Targets:"
-	@echo "  setup    Download chain config"
+	@echo "  setup    Download chain config and optionally restore a snapshot"
+	@echo "           Set SNAPSHOT_ENABLED=true in .env to restore before starting"
 	@echo "  up       Start containers"
 	@echo "  down     Stop containers"
 	@echo "  logs     Show container logs"
@@ -29,7 +30,7 @@ help:
 	@echo ""
 
 
-setup: download
+setup: download snapshot
 	@echo "Setup complete! Run 'make up' to start the node."
 
 download:
@@ -38,6 +39,15 @@ ifndef NETWORK
 endif
 	@echo "Downloading config for $(NETWORK)..."
 	./download-config.sh $(DOWNLOAD_FLAGS) $(NETWORK)
+
+snapshot:
+	@SNAPSHOT_ENABLED_VALUE=$$(awk -F= '/^SNAPSHOT_ENABLED=/{value=$$2; gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$$/, "", value); print value; exit}' .env 2>/dev/null); \
+	if [ "$${SNAPSHOT_ENABLED_VALUE:-false}" = "true" ]; then \
+		echo "Restoring snapshot for $(NETWORK)..."; \
+		./download-snapshot.sh $(NETWORK); \
+	else \
+		echo "Snapshot restore disabled; skipping."; \
+	fi
 
 up:
 	@echo "Starting containers with $(COMPOSE_FILE)..."

@@ -18,6 +18,7 @@ This repository contains the relevant Docker builds to run your own node on the 
 - `make`
 - `jq`
 - `curl` and `bc`
+- Google Cloud CLI with `gcloud storage` (required when restoring snapshots)
 
 ## Hardware Requirements
 
@@ -56,12 +57,15 @@ Before starting, configure these in your `.env` file:
 | `PARENT_CHAIN_RPC` | Parent chain RPC URL |
 | `DAS_URL` | Data Availability Server URL |
 | `PARENT_CHAIN_BEACON_URL` | Beacon chain RPC (required if parent is Ethereum mainnet) |
+| `GCP_PROJECT` | Google Cloud billing project used by `gcloud storage` for requester-pays snapshot downloads; defaults to the active `gcloud` project when unset |
 
 **Note:** `FORWARDING_TARGET` and `SEQUENCER_FEED_RELAY` are automatically set by `make setup`. For production usage, create an API key in the [Conduit application](https://app.conduit.xyz/nodes) and append it to the URL:
 ```
 FORWARDING_TARGET=https://rpc-<network-slug>.t.conduit.xyz/<api-key>
 SEQUENCER_FEED_RELAY=wss://relay-<network-slug>.t.conduit.xyz/<api-key>
 ```
+
+**Note:** Snapshot restores stream from a requester-pays Google Cloud Storage bucket into `./data/${CHAIN_NAME}`. Set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup` to enable restore. Set `GCP_PROJECT` in `.env`, export it, or configure an active `gcloud` project for billing.
 
 ### Celestia-specific
 
@@ -89,6 +93,8 @@ make setup NETWORK=<network-slug>
 make up
 ```
 
+To restore the latest snapshot during setup, set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup`.
+
 **Celestia (Alt DA) chains:**
 ```bash
 make setup NETWORK=<network-slug> ALTDA=celestia
@@ -108,8 +114,8 @@ make clean [ALTDA=celestia]   # Stop and remove all data, add ALTDA flag if its 
 
 | Command | Description |
 |---------|-------------|
-| `make setup NETWORK=<slug>` | Download chain config |
-| `make setup NETWORK=<slug> ALTDA=celestia` | Download config for Celestia enabled chains |
+| `make setup NETWORK=<slug>` | Download chain config and optionally restore a snapshot |
+| `make setup NETWORK=<slug> ALTDA=celestia` | Download config for Celestia enabled chains and optionally restore a snapshot |
 | `make up` | Start containers (add `ALTDA=celestia` if using celestia) |
 | `make down` | Stop containers (add `ALTDA=celestia` if using celestia) |
 | `make logs` | Show container logs |
@@ -125,6 +131,7 @@ make clean [ALTDA=celestia]   # Stop and remove all data, add ALTDA flag if its 
 | `docker-compose.celestia.yml` | Celestia DA with AnyTrust fallback |
 | `.env.example` | Environment variable template |
 | `download-config.sh` | Downloads chainInfo.json and other required info from Conduit API |
+| `download-snapshot.sh` | Restores the Conduit `latest.tar` snapshot into `./data/${CHAIN_NAME}` when enabled during setup |
 | `sync-status.sh` | Monitors node sync progress |
 
 ## Data Storage
