@@ -64,7 +64,7 @@ ensure_datadir() {
     local parent
 
     parent="$(dirname "$DATADIR")"
-    if ! mkdir -p "$DATADIR"; then
+    if ! mkdir -p "$DATADIR" "$RESTORE_DIR"; then
         echo "Error: unable to create snapshot data directory: ${DATADIR}"
         echo "The parent directory ${parent} is not writable by the current user."
         echo "Fix host permissions, for example:"
@@ -107,16 +107,26 @@ fi
 
 CHAIN_NAME="${CHAIN_NAME:-$(read_env_value CHAIN_NAME)}"
 DATADIR="${DATADIR:-./data/${CHAIN_NAME:-$NETWORK}}"
+RESTORE_DIR="${RESTORE_DIR:-${DATADIR}/conduit-orbit-deployer/nitro}"
 
 ensure_datadir
 
-if find "$DATADIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+if [[ -d "${DATADIR}/l2chaindata" ]]; then
+    echo "Error: snapshot data appears to be restored at the wrong level: ${DATADIR}/l2chaindata"
+    echo "Nitro expects snapshot data under: ${RESTORE_DIR}"
+    echo "Remove the broken data directory and rerun setup:"
+    echo "  sudo rm -rf ${DATADIR}"
+    exit 1
+fi
+
+if find "$RESTORE_DIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
     make_writable "$DATADIR" -R a+rwX
-    echo "Snapshot restore skipped: ${DATADIR} already contains data."
+    echo "Snapshot restore skipped: ${RESTORE_DIR} already contains data."
     exit 0
 fi
 
 make_writable "$DATADIR" a+rwX
+make_writable "$RESTORE_DIR" a+rwX
 
 if ! command -v gcloud >/dev/null 2>&1; then
     echo "Error: gcloud is required to restore requester-pays snapshots."
@@ -149,7 +159,7 @@ if [[ "$SNAPSHOT_TOTAL_BYTES" =~ ^[0-9]+$ ]]; then
     SNAPSHOT_TOTAL_SIZE="$(format_bytes "$SNAPSHOT_TOTAL_BYTES")"
 fi
 
-echo "Streaming snapshot from ${SNAPSHOT_URL} into ${DATADIR}..."
+echo "Streaming snapshot from ${SNAPSHOT_URL} into ${RESTORE_DIR}..."
 if [[ -n "$SNAPSHOT_TOTAL_SIZE" ]]; then
     echo "Snapshot size: ${SNAPSHOT_TOTAL_SIZE}."
 fi
@@ -159,7 +169,7 @@ trap stop_progress_monitor EXIT
 trap 'stop_progress_monitor; exit 130' INT
 trap 'stop_progress_monitor; exit 143' TERM
 gcloud --billing-project="$GCP_PROJECT" storage cat "$SNAPSHOT_URL" |
-    tar --no-same-owner --no-same-permissions -xf - -C "$DATADIR" --strip-components=1
+    tar --no-same-owner --no-same-permissions -xf - -C "$RESTORE_DIR" --strip-components=1
 make_writable "$DATADIR" -R a+rwX
 stop_progress_monitor
 trap - EXIT INT TERM
