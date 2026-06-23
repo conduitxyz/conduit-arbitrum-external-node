@@ -65,7 +65,7 @@ FORWARDING_TARGET=https://rpc-<network-slug>.t.conduit.xyz/<api-key>
 SEQUENCER_FEED_RELAY=wss://relay-<network-slug>.t.conduit.xyz/<api-key>
 ```
 
-**Note:** Snapshot restores stream from a requester-pays Google Cloud Storage bucket into `./data/${CHAIN_NAME}`. Set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup` to enable restore. Set `GCP_PROJECT` in `.env`, export it, or configure an active `gcloud` project for billing. The authenticated Google Cloud account also needs the `roles/serviceusage.serviceUsageConsumer` role on the billing project used for requester-pays requests.
+**Note:** Snapshot restores stream from a requester-pays Google Cloud Storage bucket into `./data/${CHAIN_NAME}`. Set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup` to enable restore. Set `GCP_PROJECT` in `.env`, export it, or configure an active `gcloud` project for billing. The authenticated Google Cloud account also needs the `roles/serviceusage.serviceUsageConsumer` role on the billing project used for requester-pays requests. ([GCP docs](https://docs.cloud.google.com/storage/docs/requester-pays#requirements))
 
 ### Celestia-specific
 
