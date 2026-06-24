@@ -1,4 +1,4 @@
-.PHONY: setup download up down logs status clean help
+.PHONY: setup download snapshot prepare-data up down logs status clean help
 
 NETWORK ?=
 ALTDA ?= false
@@ -20,7 +20,9 @@ help:
 	@echo "  make setup NETWORK=<slug> ALTDA=celestia   Setup Celestia DA network"
 	@echo ""
 	@echo "Targets:"
-	@echo "  setup    Download chain config"
+	@echo "  setup    Download chain config and optionally restore a snapshot"
+	@echo "           Set SNAPSHOT_ENABLED=true in .env to restore before starting"
+	@echo "  prepare-data  Create the host data directory with container-writable permissions"
 	@echo "  up       Start containers"
 	@echo "  down     Stop containers"
 	@echo "  logs     Show container logs"
@@ -29,7 +31,7 @@ help:
 	@echo ""
 
 
-setup: download
+setup: download snapshot
 	@echo "Setup complete! Run 'make up' to start the node."
 
 download:
@@ -39,7 +41,23 @@ endif
 	@echo "Downloading config for $(NETWORK)..."
 	./download-config.sh $(DOWNLOAD_FLAGS) $(NETWORK)
 
-up:
+snapshot:
+	@SNAPSHOT_ENABLED_VALUE=$$(awk -F= '/^SNAPSHOT_ENABLED=/{value=$$2; gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$$/, "", value); print value; exit}' .env 2>/dev/null); \
+	if [ "$${SNAPSHOT_ENABLED_VALUE:-false}" = "true" ]; then \
+		echo "Restoring snapshot for $(NETWORK)..."; \
+		./download-snapshot.sh $(NETWORK); \
+	else \
+		echo "Snapshot restore disabled; skipping."; \
+	fi
+
+prepare-data:
+	@CHAIN_NAME_VALUE=$$(awk -F= '/^CHAIN_NAME=/{value=$$2; gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$$/, "", value); print value; exit}' .env 2>/dev/null); \
+	DATA_DIR="./data/$${CHAIN_NAME_VALUE:-default}"; \
+	echo "Preparing $$DATA_DIR for container writes..."; \
+	mkdir -p "$$DATA_DIR" || (echo "Error: unable to create $$DATA_DIR. Fix host permissions, for example: sudo chown -R \$$(id -u):\$$(id -g) ./data" && exit 1); \
+	chmod a+rwx "$$DATA_DIR" || echo "Warning: unable to update permissions for $$DATA_DIR; if the node cannot write there, fix host permissions and rerun make up."
+
+up: prepare-data
 	@echo "Starting containers with $(COMPOSE_FILE)..."
 	docker compose -f $(COMPOSE_FILE) up -d
 
