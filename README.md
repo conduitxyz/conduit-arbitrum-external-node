@@ -6,6 +6,8 @@ Conduit provides fully-managed, production-grade rollups on Ethereum. We highly 
 
 This repository contains the relevant Docker builds to run your own node on the specific Conduit network.
 
+Supported data availability options are AnyTrust DAS and parent-chain blobs, using the same Docker Compose configuration.
+
 [![Website conduit.xyz](https://img.shields.io/website-up-down-green-red/https/conduit.xyz.svg)](https://conduit.xyz)
 [![Status](https://img.shields.io/badge/status-up-green)](https://status.conduit.xyz/)
 [![Blog](https://img.shields.io/badge/blog-up-green)](https://conduit.xyz/blog)
@@ -19,6 +21,14 @@ This repository contains the relevant Docker builds to run your own node on the 
 - `jq`
 - `curl` and `bc`
 - Google Cloud CLI with `gcloud storage` (required when restoring snapshots)
+
+## Software Versions
+
+| Component | Default Version | Docker Image |
+|-----------|-----------------|--------------|
+| Nitro | [v3.12.1](https://github.com/OffchainLabs/nitro/releases/tag/v3.12.1) | `offchainlabs/nitro-node:v3.12.1-70fa99a` |
+
+Leave `NITRO_IMAGE` empty in `.env` to use this default. To select another compatible Nitro version, set `NITRO_IMAGE` to its full Docker image tag.
 
 ## Hardware Requirements
 
@@ -55,9 +65,12 @@ Before starting, configure these in your `.env` file:
 | `FORWARDING_TARGET` | Sequencer RPC URL (e.g., `https://rpc-<network-slug>.t.conduit.xyz`) |
 | `SEQUENCER_FEED_RELAY` | Websocket relay URL (e.g., `wss://relay-<network-slug>.t.conduit.xyz/`) |
 | `PARENT_CHAIN_RPC` | Parent chain RPC URL |
-| `DAS_URL` | Data Availability Server URL |
-| `PARENT_CHAIN_BEACON_URL` | Beacon chain RPC (required if parent is Ethereum mainnet) |
+| `DAS_URL` | Data Availability Server URL for AnyTrust chains; set automatically by `make setup` |
+| `PARENT_CHAIN_BEACON_URL` | Required for Ethereum mainnet/Sepolia parents; leave empty for HyperEVM/Arbitrum parents |
+| `DISABLE_BLOB_READER` | Defaults to `false`; set to `true` for HyperEVM parents |
 | `GCP_PROJECT` | Google Cloud billing project used by `gcloud storage` for requester-pays snapshot downloads; defaults to the active `gcloud` project when unset |
+
+For HyperEVM parents, set `DISABLE_BLOB_READER=true` and leave `PARENT_CHAIN_BEACON_URL` empty. For Arbitrum parents, leave the beacon URL empty and keep `DISABLE_BLOB_READER=false`; Nitro automatically skips blob reading on Arbitrum parents. Nitro otherwise requires a beacon URL on non-Arbitrum parents, even for AnyTrust chains. For Ethereum mainnet/Sepolia parents, keep `DISABLE_BLOB_READER=false` and provide the beacon URL so the node can read blob batches.
 
 **Note:** `FORWARDING_TARGET` and `SEQUENCER_FEED_RELAY` are automatically set by `make setup`. For production usage, create an API key in the [Conduit application](https://app.conduit.xyz/nodes) and append it to the URL:
 ```
@@ -66,14 +79,6 @@ SEQUENCER_FEED_RELAY=wss://relay-<network-slug>.t.conduit.xyz/<api-key>
 ```
 
 **Note:** Snapshot restores stream from a requester-pays Google Cloud Storage bucket into `./data/${CHAIN_NAME}`. Set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup` to enable restore. Set `GCP_PROJECT` in `.env`, export it, or configure an active `gcloud` project for billing. The authenticated Google Cloud account also needs the `roles/serviceusage.serviceUsageConsumer` role on the billing project used for requester-pays requests. ([GCP docs](https://docs.cloud.google.com/storage/docs/requester-pays#requirements))
-
-### Celestia-specific
-
-| Variable | Description |
-|----------|-------------|
-| `CELESTIA_RPC` | Celestia RPC endpoint |
-| `CELESTIA_NAMESPACE_ID` | Celestia namespace |
-| `SEQUENCER_INBOX_ADDRESS` | Sequencer inbox contract |
 
 ## Quick Start
 
@@ -87,7 +92,8 @@ Edit `.env` with the required variables listed above.
 
 ### 2. Setup and Run
 
-**ETH DA chains:**
+For AnyTrust DAS or parent-chain blob chains:
+
 ```bash
 make setup NETWORK=<network-slug>
 make up
@@ -95,19 +101,13 @@ make up
 
 To restore the latest snapshot during setup, set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup`.
 
-**Celestia (Alt DA) chains:**
-```bash
-make setup NETWORK=<network-slug> ALTDA=celestia
-make up ALTDA=celestia
-```
-
 ### 3. Monitor and Manage
 
 ```bash
 make status    # Show sync progress
 make logs      # Show container logs
-make down [ALTDA=celestia]  # Stop containers, add ALTDA flag if its enabled
-make clean [ALTDA=celestia]   # Stop and remove all data, add ALTDA flag if its enabled
+make down      # Stop containers
+make clean     # Stop and remove all data
 ```
 
 ## Make Commands
@@ -115,20 +115,18 @@ make clean [ALTDA=celestia]   # Stop and remove all data, add ALTDA flag if its 
 | Command | Description |
 |---------|-------------|
 | `make setup NETWORK=<slug>` | Download chain config and optionally restore a snapshot |
-| `make setup NETWORK=<slug> ALTDA=celestia` | Download config for Celestia enabled chains and optionally restore a snapshot |
-| `make up` | Start containers (add `ALTDA=celestia` if using celestia) |
-| `make down` | Stop containers (add `ALTDA=celestia` if using celestia) |
+| `make up` | Start containers |
+| `make down` | Stop containers |
 | `make logs` | Show container logs |
 | `make status` | Show sync progress |
-| `make clean` | Stop containers and remove data (add `ALTDA=celestia` if using celestia) |
+| `make clean` | Stop containers and remove data |
 
 ## Configuration Files
 
 | File | Description |
 |------|-------------|
 | `Makefile` | Make commands for setup and management |
-| `docker-compose.yml` | AnyTrust (DAS) configuration |
-| `docker-compose.celestia.yml` | Celestia DA with AnyTrust fallback |
+| `docker-compose.yml` | Nitro configuration for AnyTrust DAS and parent-chain blobs |
 | `.env.example` | Environment variable template |
 | `download-config.sh` | Downloads chainInfo.json and other required info from Conduit API |
 | `download-snapshot.sh` | Restores the Conduit `latest.tar` snapshot into `./data/${CHAIN_NAME}` when enabled during setup |

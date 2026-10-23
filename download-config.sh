@@ -3,29 +3,14 @@
 
 set -e
 
-# Parse arguments
-CELESTIA=false
-SLUG=""
-
-for arg in "$@"; do
-    case $arg in
-        --celestia)
-            CELESTIA=true
-            ;;
-        *)
-            SLUG=$arg
-            ;;
-    esac
-done
-
-API_URL="https://api.conduit.xyz/file/v1/arbitrum/chaininfo"
-CELESTIA_NS_API_URL="https://api.conduit.xyz/public/network/celestiaNamespace"
-
-if [ -z "$SLUG" ]; then
-    echo "Error: Network slug required."
-    echo "Use: make setup NETWORK=<slug>"
+if [[ $# -ne 1 || -z "${1:-}" || "$1" == -* ]]; then
+    echo "Error: Exactly one network slug is required; options are not supported." >&2
+    echo "Usage: $0 <network-slug> (or make setup NETWORK=<slug>)" >&2
     exit 1
 fi
+
+SLUG=$1
+API_URL="https://api.conduit.xyz/file/v1/arbitrum/chaininfo"
 
 echo "Fetching chainInfo.json for $SLUG..."
 curl -sf "${API_URL}/${SLUG}" -o chainInfo.json
@@ -64,53 +49,18 @@ if [ -f .env ]; then
     echo "  DAS_URL=https://das-${SLUG}.t.conduit.xyz"
 fi
 
-# Extract and write sequencer-inbox address to .env
-if command -v jq &> /dev/null && [ -f .env ]; then
-    SEQ_INBOX=$(jq -r '.chain["info-json"] | fromjson | .[0].rollup["sequencer-inbox"] // empty' chainInfo.json 2>/dev/null)
-    if [ -n "$SEQ_INBOX" ]; then
-        update_env "SEQUENCER_INBOX_ADDRESS" "$SEQ_INBOX"
-        echo "  SEQUENCER_INBOX_ADDRESS=$SEQ_INBOX"
-        echo ""
-    fi
-fi
-
-# Fetch and set Celestia namespace if celestia mode
-if [ "$CELESTIA" = "true" ] && [ -f .env ] && command -v jq &> /dev/null; then
-    echo "Fetching Celestia namespace for $SLUG..."
-    CELESTIA_NS_RAW=$(curl -sf "${CELESTIA_NS_API_URL}/${SLUG}" | jq -r '.namespace // empty')
-
-    if [ -n "$CELESTIA_NS_RAW" ]; then
-        CELESTIA_NS="${CELESTIA_NS_RAW: -20}"
-
-        update_env "CELESTIA_NAMESPACE_ID" "$CELESTIA_NS"
-        echo "  CELESTIA_NAMESPACE_ID=$CELESTIA_NS"
-    else
-        echo "Warning: Could not fetch Celestia namespace for $SLUG"
-    fi
-fi
-
-if [ "$CELESTIA" = "true" ]; then
-    echo "Configuration: Celestia DA (with AnyTrust fallback)"
-    echo ""
-    echo "Required .env variables:"
-    echo "  - FORWARDING_TARGET"
-    echo "  - SEQUENCER_FEED_RELAY"
-    echo "  - PARENT_CHAIN_RPC"
-    echo "  - PARENT_CHAIN_BEACON_URL (if parent chain is Ethereum mainnet)"
-    echo "  - DAS_URL"
-    echo "  - CELESTIA_RPC"
-    echo "  - CELESTIA_NAMESPACE_ID"
-    echo "  - SEQUENCER_INBOX_ADDRESS"
-    echo ""
-    echo "Run with:"
-    echo "  docker compose -f docker-compose.celestia.yml up -d"
-else
-    echo "Configuration: ETH DA"
-    echo ""
-    echo "Required .env variables:"
-    echo "  - FORWARDING_TARGET"
-    echo "  - SEQUENCER_FEED_RELAY"
-    echo "  - PARENT_CHAIN_RPC"
-    echo "  - DAS_URL"
-    echo ""
-fi
+echo "Configuration: AnyTrust DAS or parent-chain blobs"
+echo ""
+echo "Required .env variables:"
+echo "  - FORWARDING_TARGET"
+echo "  - SEQUENCER_FEED_RELAY"
+echo "  - PARENT_CHAIN_RPC"
+echo "  - PARENT_CHAIN_BEACON_URL (for Ethereum mainnet or Ethereum Sepolia parents)"
+echo "  - DAS_URL (for AnyTrust chains)"
+echo ""
+echo "For HyperEVM parents: set DISABLE_BLOB_READER=true and leave PARENT_CHAIN_BEACON_URL empty."
+echo "For Arbitrum parents: keep DISABLE_BLOB_READER=false and leave PARENT_CHAIN_BEACON_URL empty; Nitro detects the parent automatically."
+echo "For Ethereum mainnet/Sepolia parents: keep DISABLE_BLOB_READER=false and provide PARENT_CHAIN_BEACON_URL."
+echo ""
+echo "Run with:"
+echo "  make up"

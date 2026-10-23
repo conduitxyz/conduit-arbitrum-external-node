@@ -1,8 +1,8 @@
-# Usage: make up 
+# Usage: make up
 services:
   node:
     container_name: node
-    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.9.5-66e42c4}
+    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.12.1-70fa99a}
     platform: linux/amd64
     restart: unless-stopped
     ports:
@@ -13,6 +13,8 @@ services:
       - "./data/${CHAIN_NAME:-default}:/home/user/.arbitrum"
     entrypoint:
       - "/usr/local/bin/nitro"
+      - --init.validate-genesis-assertion=false
+      - --validation.wasm.allowed-wasm-module-roots=/home/user/nitro-legacy/machines,/home/user/target/machines
       - --conf.file=/config/chainInfo.json
       - --node.staker.enable=false
       - --execution.forwarding-target=${FORWARDING_TARGET}
@@ -23,8 +25,9 @@ services:
       - --node.feed.input.url=${SEQUENCER_FEED_RELAY}
       - --parent-chain.connection.url=${PARENT_CHAIN_RPC}
       - --parent-chain.blob-client.beacon-url=${PARENT_CHAIN_BEACON_URL}
-      - --node.data-availability.enable
-      - --node.data-availability.rest-aggregator.enable
-      - --node.data-availability.rest-aggregator.urls=${DAS_URL}
+      - --node.dangerous.disable-blob-reader=${DISABLE_BLOB_READER:-false}
+      - --node.da.anytrust.enable
+      - --node.da.anytrust.rest-aggregator.enable
+      - --node.da.anytrust.rest-aggregator.urls=${DAS_URL}
       - --execution.caching.archive
       # comment the line above if you do not want to run in archive mode
