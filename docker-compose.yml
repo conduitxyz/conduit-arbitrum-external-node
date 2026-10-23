@@ -1,8 +1,8 @@
-# Usage: make up 
+# Usage: make up
 services:
   node:
     container_name: node
-    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.9.5-66e42c4}
+    image: ${NITRO_IMAGE:-offchainlabs/nitro-node:v3.12.1-70fa99a}
     platform: linux/amd64
     restart: unless-stopped
     ports:
@@ -13,6 +13,7 @@ services:
       - "./data/${CHAIN_NAME:-default}:/home/user/.arbitrum"
     entrypoint:
       - "/usr/local/bin/nitro"
+      - --validation.wasm.allowed-wasm-module-roots=/home/user/nitro-legacy/machines,/home/user/target/machines
       - --conf.file=/config/chainInfo.json
       - --node.staker.enable=false
       - --execution.forwarding-target=${FORWARDING_TARGET}
