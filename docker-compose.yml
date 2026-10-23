@@ -24,8 +24,9 @@ services:
       - --node.feed.input.url=${SEQUENCER_FEED_RELAY}
       - --parent-chain.connection.url=${PARENT_CHAIN_RPC}
       - --parent-chain.blob-client.beacon-url=${PARENT_CHAIN_BEACON_URL}
-      - --node.data-availability.enable
-      - --node.data-availability.rest-aggregator.enable
-      - --node.data-availability.rest-aggregator.urls=${DAS_URL}
+      - --node.dangerous.disable-blob-reader=${DISABLE_BLOB_READER:-false}
+      - --node.da.anytrust.enable
+      - --node.da.anytrust.rest-aggregator.enable
+      - --node.da.anytrust.rest-aggregator.urls=${DAS_URL}
       - --execution.caching.archive
       # comment the line above if you do not want to run in archive mode

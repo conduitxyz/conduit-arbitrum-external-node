@@ -66,8 +66,11 @@ Before starting, configure these in your `.env` file:
 | `SEQUENCER_FEED_RELAY` | Websocket relay URL (e.g., `wss://relay-<network-slug>.t.conduit.xyz/`) |
 | `PARENT_CHAIN_RPC` | Parent chain RPC URL |
 | `DAS_URL` | Data Availability Server URL for AnyTrust chains; set automatically by `make setup` |
-| `PARENT_CHAIN_BEACON_URL` | Parent chain beacon RPC (required for parent-chain blobs) |
+| `PARENT_CHAIN_BEACON_URL` | Required for Ethereum mainnet/Sepolia parents; leave empty for HyperEVM/Arbitrum parents |
+| `DISABLE_BLOB_READER` | Defaults to `false`; set to `true` for HyperEVM parents |
 | `GCP_PROJECT` | Google Cloud billing project used by `gcloud storage` for requester-pays snapshot downloads; defaults to the active `gcloud` project when unset |
+
+For HyperEVM parents, set `DISABLE_BLOB_READER=true` and leave `PARENT_CHAIN_BEACON_URL` empty. For Arbitrum parents, leave the beacon URL empty and keep `DISABLE_BLOB_READER=false`; Nitro automatically skips blob reading on Arbitrum parents. Nitro otherwise requires a beacon URL on non-Arbitrum parents, even for AnyTrust chains. For Ethereum mainnet/Sepolia parents, keep `DISABLE_BLOB_READER=false` and provide the beacon URL so the node can read blob batches.
 
 **Note:** `FORWARDING_TARGET` and `SEQUENCER_FEED_RELAY` are automatically set by `make setup`. For production usage, create an API key in the [Conduit application](https://app.conduit.xyz/nodes) and append it to the URL:
 ```
