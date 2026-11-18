@@ -171,7 +171,7 @@ fi
 SNAPSHOT_URL="gs://conduit-networks-snapshots/${NETWORK}/latest.tar"
 SNAPSHOT_METADATA="$(
     gcloud --billing-project="$GCP_PROJECT" storage objects describe "$SNAPSHOT_URL" \
-        --format='value(generation,size,crc32c)'
+        --raw --format='value(generation,size,crc32c)'
 )"
 IFS=$'\t' read -r SNAPSHOT_GENERATION SNAPSHOT_TOTAL_BYTES SNAPSHOT_CRC32C <<< "$SNAPSHOT_METADATA"
 if [[ ! "$SNAPSHOT_GENERATION" =~ ^[0-9]+$ || ! "$SNAPSHOT_TOTAL_BYTES" =~ ^[0-9]+$ || -z "$SNAPSHOT_CRC32C" ]]; then
