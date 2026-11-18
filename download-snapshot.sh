@@ -5,6 +5,7 @@ set -euo pipefail
 NETWORK="${1:-${NETWORK:-}}"
 PROGRESS_MONITOR_PID=""
 SNAPSHOT_TOTAL_SIZE=""
+STAGING_DIR=""
 
 read_env_value() {
     local key="$1"
@@ -99,6 +100,16 @@ stop_progress_monitor() {
     fi
 }
 
+cleanup() {
+    local status=$?
+    trap - EXIT INT TERM
+    stop_progress_monitor
+    if [[ -n "$STAGING_DIR" ]]; then
+        rm -rf -- "$STAGING_DIR"
+    fi
+    exit "$status"
+}
+
 if [[ -z "$NETWORK" ]]; then
     echo "Usage: ./download-snapshot.sh <network-slug>"
     echo "Or set NETWORK in the environment."
@@ -119,10 +130,16 @@ if [[ -d "${DATADIR}/l2chaindata" ]]; then
     exit 1
 fi
 
-if find "$RESTORE_DIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+if [[ -d "${RESTORE_DIR}/l2chaindata" ]]; then
     make_writable "$DATADIR" -R a+rwX
-    echo "Snapshot restore skipped: ${RESTORE_DIR} already contains data."
+    echo "Snapshot restore skipped: ${RESTORE_DIR} already contains a database."
     exit 0
+fi
+
+if [[ -n "$(find "$RESTORE_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+    echo "Error: ${RESTORE_DIR} is not empty and has no restored l2chaindata database."
+    echo "Move or remove its contents before restoring a snapshot."
+    exit 1
 fi
 
 make_writable "$DATADIR" a+rwX
@@ -152,26 +169,51 @@ if [[ -z "${GCP_PROJECT:-}" ]]; then
 fi
 
 SNAPSHOT_URL="gs://conduit-networks-snapshots/${NETWORK}/latest.tar"
-SNAPSHOT_TOTAL_BYTES="$(
-    gcloud --billing-project="$GCP_PROJECT" storage objects describe "$SNAPSHOT_URL" --format="value(size)" 2>/dev/null || true
+SNAPSHOT_METADATA="$(
+    gcloud --billing-project="$GCP_PROJECT" storage objects describe "$SNAPSHOT_URL" \
+        --format='value(generation,size,crc32c)'
 )"
-if [[ "$SNAPSHOT_TOTAL_BYTES" =~ ^[0-9]+$ ]]; then
-    SNAPSHOT_TOTAL_SIZE="$(format_bytes "$SNAPSHOT_TOTAL_BYTES")"
+IFS=$'\t' read -r SNAPSHOT_GENERATION SNAPSHOT_TOTAL_BYTES SNAPSHOT_CRC32C <<< "$SNAPSHOT_METADATA"
+if [[ ! "$SNAPSHOT_GENERATION" =~ ^[0-9]+$ || ! "$SNAPSHOT_TOTAL_BYTES" =~ ^[0-9]+$ || -z "$SNAPSHOT_CRC32C" ]]; then
+    echo "Error: snapshot metadata must include generation, size and CRC32C."
+    exit 1
 fi
+SNAPSHOT_TOTAL_SIZE="$(format_bytes "$SNAPSHOT_TOTAL_BYTES")"
+SNAPSHOT_URL="${SNAPSHOT_URL}#${SNAPSHOT_GENERATION}"
+
+# Keep the database out of the live path until the full stream is validated.
+# This is one extracted copy on the same filesystem; no archive file is saved.
+STAGING_DIR="$(mktemp -d "${RESTORE_DIR%/}.restore.XXXXXX")"
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 echo "Streaming snapshot from ${SNAPSHOT_URL} into ${RESTORE_DIR}..."
-if [[ -n "$SNAPSHOT_TOTAL_SIZE" ]]; then
-    echo "Snapshot size: ${SNAPSHOT_TOTAL_SIZE}."
-fi
+echo "Snapshot size: ${SNAPSHOT_TOTAL_SIZE}; expected CRC32C: ${SNAPSHOT_CRC32C}."
 echo "Large database files may take a while to extract without additional output."
 start_progress_monitor
-trap stop_progress_monitor EXIT
-trap 'stop_progress_monitor; exit 130' INT
-trap 'stop_progress_monitor; exit 143' TERM
-gcloud --billing-project="$GCP_PROJECT" storage cat "$SNAPSHOT_URL" |
-    tar --no-same-owner --no-same-permissions -xf - -C "$RESTORE_DIR" --strip-components=1
-make_writable "$DATADIR" -R a+rwX
+if CLOUDSDK_STORAGE_CHECK_HASHES=always gcloud --billing-project="$GCP_PROJECT" storage cp --do-not-decompress "$SNAPSHOT_URL" - | {
+    if tar --no-same-owner --no-same-permissions -xf - -C "$STAGING_DIR" --strip-components=1; then
+        # tar can stop at archive-end markers before EOF. Drain trailing bytes
+        # so gcloud can validate the complete object rather than a short stream.
+        cat > /dev/null
+    else
+        exit "$?"
+    fi
+}; then
+    echo "Snapshot download checksum verified."
+else
+    echo "Error: snapshot download, checksum validation or extraction failed."
+    exit 1
+fi
+if [[ ! -d "$STAGING_DIR/l2chaindata" ]]; then
+    echo "Error: snapshot does not contain the expected l2chaindata database."
+    exit 1
+fi
 stop_progress_monitor
-trap - EXIT INT TERM
+make_writable "$STAGING_DIR" -R a+rwX
+rmdir -- "$RESTORE_DIR"
+mv -- "$STAGING_DIR" "$RESTORE_DIR"
+STAGING_DIR=""
 
 echo "Snapshot restore complete."

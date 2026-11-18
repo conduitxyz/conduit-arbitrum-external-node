@@ -80,6 +80,8 @@ SEQUENCER_FEED_RELAY=wss://relay-<network-slug>.t.conduit.xyz/<api-key>
 
 **Note:** Snapshot restores stream from a requester-pays Google Cloud Storage bucket into `./data/${CHAIN_NAME}`. Set `SNAPSHOT_ENABLED=true` in `.env` before running `make setup` to enable restore. Set `GCP_PROJECT` in `.env`, export it, or configure an active `gcloud` project for billing. The authenticated Google Cloud account also needs the `roles/serviceusage.serviceUsageConsumer` role on the billing project used for requester-pays requests. ([GCP docs](https://docs.cloud.google.com/storage/docs/requester-pays#requirements))
 
+The downloader pins the snapshot generation and forces checksum validation with `gcloud storage cp`. It consumes the entire stream, including trailing archive bytes, and extracts into a temporary directory beside the Nitro restore directory. The extracted database is renamed into place only after validation and extraction succeed; failed restores are removed automatically. No archive file is saved, so restore needs space for one extracted database plus node growth rather than two copies. Existing databases are preserved, and other nonempty restore directories must be cleared or moved before restoring.
+
 ## Quick Start
 
 ### 1. Configure Environment
