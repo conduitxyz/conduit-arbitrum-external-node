@@ -212,6 +212,10 @@ if [[ ! -d "$STAGING_DIR/l2chaindata" ]]; then
 fi
 stop_progress_monitor
 make_writable "$STAGING_DIR" -R a+rwX
+# Nitro writes its crash log alongside nitro/, including on a fresh restore.
+if [[ -d "$DATADIR/conduit-orbit-deployer" ]]; then
+    chmod a+rwx "$DATADIR/conduit-orbit-deployer"
+fi
 rmdir -- "$RESTORE_DIR"
 mv -- "$STAGING_DIR" "$RESTORE_DIR"
 STAGING_DIR=""
